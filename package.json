@@ -38,6 +38,9 @@
     "url": "https://github.com/SaidKSI/localize-core/issues"
   },
   "homepage": "https://github.com/SaidKSI/localize-core#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
     "@babel/parser": "^7.25.0",
