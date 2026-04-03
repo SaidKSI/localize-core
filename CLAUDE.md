@@ -1,6 +1,6 @@
-# CLAUDE.md - @localize/core
+# CLAUDE.md - @saidksi/localizer-core
 
-Core library for the Localize i18n CLI tool. This is a **public npm package** (`@localize/core`) that provides the business logic for AST scanning, AI-powered key generation, code transformation, and validation.
+Core library for the Localizer i18n CLI tool. This is a **public npm package** (`@saidksi/localizer-core`) that provides the business logic for AST scanning, AI-powered key generation, code transformation, and validation.
 
 ---
 
@@ -13,9 +13,11 @@ Core library for the Localize i18n CLI tool. This is a **public npm package** (`
 - Validates translation key coverage across language files
 - Caches file hashes to avoid re-processing unchanged code
 
-**Status:** V0.1.0 — Core logic complete and tested. Ready for npm publishing.
+**Status:** V0.1.0 — Core logic complete. Ready to publish to npm.
 
+**Package:** `@saidksi/localizer-core@0.1.0` (npm)
 **Repository:** https://github.com/SaidKSI/localize-core
+**GitHub Actions:** ✅ CI + Auto-publish on tags (v*)
 
 ---
 
@@ -308,19 +310,27 @@ npm publish
 
 ## Publishing to npm
 
-**Current Status:** Ready to publish
+**Current Status:** Ready to publish! ✅
 
-**Steps:**
-1. Ensure `npm login` is done
-2. Run `npm publish`
-3. Tag version: `git tag v0.1.0 && git push origin v0.1.0`
+**How Publishing Works:**
+1. Tag a release: `git tag v0.1.0` 
+2. Push tag: `git push origin v0.1.0`
+3. GitHub Actions automatically:
+   - Builds the package with `pnpm build`
+   - Verifies output in `dist/`
+   - Publishes to npm using `NPM_TOKEN` secret
+   - You can watch at: https://github.com/SaidKSI/localize-core/actions
 
 **Package Details:**
-- **Name:** `@localize/core`
+- **Name:** `@saidksi/localizer-core`
 - **Version:** `0.1.0`
+- **npm:** https://www.npmjs.com/package/@saidksi/localizer-core
 - **Type:** ESM module
 - **Exports:** `.` (default), `./types` (type definitions)
 - **Files:** `dist/` only (source excluded)
+
+**GitHub Secrets Required:**
+- `NPM_TOKEN` — npm automation token (already configured)
 
 ---
 
@@ -337,12 +347,19 @@ npm publish
 
 ## Related Repos
 
-- **localize-cli** — CLI app that uses this core library
+- **localizer-cli** — CLI app that uses this core library
   - Repo: https://github.com/SaidKSI/localize-cli
-  - Depends on: `@localize/core@^0.1.0`
+  - Depends on: `@saidksi/localizer-core@^0.1.0` (npm)
+  - Status: Ready to publish after core is available
+
+- **localize-sample-app** — Testing app for CLI
+  - Repo: https://github.com/SaidKSI/localize-sample-app
+  - Framework: React 18 + Vite + TypeScript
+  - 40+ hardcoded strings for CLI testing
+  - Languages: en, fr, es (empty JSONs ready for translation)
 
 - **localize-dashboard** (Phase 2, private)
-  - Will also depend on `@localize/core`
+  - Will depend on `localize-core`
   - Handles auth, billing, UI
 
 ---
@@ -350,6 +367,7 @@ npm publish
 ## Key Contacts & Resources
 
 - **GitHub Issues:** https://github.com/SaidKSI/localize-core/issues
-- **npm Package:** https://www.npmjs.com/package/@localize/core (once published)
+- **npm Package:** https://www.npmjs.com/package/@saidksi/localizer-core
+- **GitHub Actions:** https://github.com/SaidKSI/localize-core/actions
 - **Author:** SaidKSI
 - **License:** MIT
