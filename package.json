@@ -1,0 +1,61 @@
+{
+  "name": "@localize/core",
+  "version": "0.1.0",
+  "description": "Core i18n automation library for localize",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/types.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "i18n",
+    "internationalization",
+    "localization",
+    "ast",
+    "code-generation",
+    "typescript"
+  ],
+  "author": "SaidKSI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SaidKSI/localize-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SaidKSI/localize-core/issues"
+  },
+  "homepage": "https://github.com/SaidKSI/localize-core#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@babel/parser": "^7.25.0",
+    "@babel/traverse": "^7.25.0",
+    "@babel/types": "^7.25.0",
+    "fast-glob": "^3.3.2",
+    "openai": "^4.65.0",
+    "p-limit": "^6.1.0",
+    "ts-morph": "^23.0.0",
+    "typescript": "^5.5.0"
+  },
+  "devDependencies": {
+    "@types/babel__traverse": "^7.20.6",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
