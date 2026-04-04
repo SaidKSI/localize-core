@@ -1,6 +1,9 @@
 // Types — import these in all modules
 export * from "./types.js";
 
+// Namespace resolution
+export { resolveNamespaces, getNamespaceForFile } from "./namespace.js";
+
 // Scanner
 export { scanFile, scanFiles, scanDirectory, buildScanReport } from "./scanner/index.js";
 export { shouldFilter, NON_TRANSLATABLE_ATTRS, TRANSLATION_FNS } from "./scanner/filters.js";

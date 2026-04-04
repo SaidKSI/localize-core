@@ -95,9 +95,15 @@ function findComponentFunction(sf: ReturnType<Project["createSourceFile"]>) {
 }
 
 /**
- * Ensure the translation hook declaration exists in the first component function.
- * If the hook call is already present anywhere in the file, the source is returned unchanged.
- * Otherwise the hook statement is inserted at the top of the component function body.
+ * Ensure the translation hook declaration exists in the first component function,
+ * with the correct namespace argument.
+ *
+ * Behaviour:
+ * 1. Hook absent                        → inject `useTranslation('namespace')`
+ * 2. Hook present, no arguments         → update to `useTranslation('namespace')`
+ * 3. Hook present, has arguments        → leave as-is (respect user's choice)
+ *
+ * react-intl's `useIntl()` never receives a namespace argument (case 3 always applies).
  */
 export function ensureHook(
   source: string,
@@ -105,9 +111,42 @@ export function ensureHook(
   adapter: LibraryAdapter,
   namespace?: string,
 ): string {
-  // Fast path: hook already present in source text
-  if (source.includes(adapter.hookDetectionString)) return source;
+  const supportsNamespace = adapter.importSpecifier !== "useIntl";
+  const effectiveNs = namespace && supportsNamespace ? namespace : undefined;
 
+  // ── Case 1: hook not present at all → inject ─────────────────────────────
+  if (!source.includes(adapter.hookDetectionString)) {
+    return injectHook(source, filePath, adapter, effectiveNs);
+  }
+
+  // ── Case 2: hook present with no arguments → add namespace ───────────────
+  // Matches: useTranslation()  useTranslation( )  useTranslations()  etc.
+  if (effectiveNs) {
+    const noArgsRegex = new RegExp(
+      `\\b${adapter.importSpecifier}\\s*\\(\\s*\\)`,
+    );
+    if (noArgsRegex.test(source)) {
+      return source.replace(
+        noArgsRegex,
+        `${adapter.importSpecifier}('${effectiveNs}')`,
+      );
+    }
+  }
+
+  // ── Case 3: hook present with arguments → leave as-is ────────────────────
+  return source;
+}
+
+/**
+ * Inject the hook statement at the top of the first component function body.
+ * Extracted from ensureHook so both the "absent" and future callers can use it.
+ */
+function injectHook(
+  source: string,
+  filePath: string,
+  adapter: LibraryAdapter,
+  namespace?: string,
+): string {
   const project = new Project({ useInMemoryFileSystem: true });
   const sf = project.createSourceFile(filePath, source, { overwrite: true });
 
@@ -120,23 +159,15 @@ export function ensureHook(
 
   if (!body) return source;
 
-  // For arrow functions with expression bodies (no braces), convert to block first
-  if (!Node.isBlock(body)) {
-    // e.g. `const X = () => <div/>` — not common in real components, skip
-    return source;
-  }
+  // Arrow functions with expression bodies (no braces) are uncommon in real
+  // components — skip rather than attempt a block conversion.
+  if (!Node.isBlock(body)) return source;
 
-  // Build the hook statement, using namespace if provided and if the hook accepts it
-  // Only useTranslation, useTranslations, and useI18n accept namespace argument.
-  // react-intl's useIntl() does not accept a namespace argument.
-  const supportsNamespace = adapter.importSpecifier !== "useIntl";
-  const hookStatement = namespace && supportsNamespace
+  const hookStatement = namespace
     ? adapter.hookStatement.replace("()", `('${namespace}')`)
     : adapter.hookStatement;
 
-  // Insert hook at the very beginning of the function body (index 0)
   body.insertStatements(0, [hookStatement]);
-
   return sf.getFullText();
 }
 

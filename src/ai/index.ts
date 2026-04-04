@@ -5,6 +5,7 @@ import { deduplicateResults, buildAIRequests, applyResolvedKeys } from "./dedup.
 import { callAnthropic, estimateCost } from "./anthropic.js";
 import { callOpenAI } from "./openai.js";
 import { flattenKeys } from "../validator/index.js";
+import { resolveNamespaces } from "../namespace.js";
 
 // ─── Key conflict resolution (flat key vs nested namespace) ──────────────────
 
@@ -107,11 +108,6 @@ function normalizeConsistentKeys(
 
 // ─── Messages JSON helpers ────────────────────────────────────────────────────
 
-/** "src/pages/Login.tsx" → "login" */
-function getPageName(filePath: string): string {
-  return basename(filePath, extname(filePath)).toLowerCase();
-}
-
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -202,16 +198,20 @@ async function mergeIntoMessagesFile(
 
 /**
  * Given resolved scan results, write all translations to the messages directory.
- * Groups by source file → writes to messages/{lang}/{pageName}.json.
+ * Groups by source file → writes to messages/{lang}/{namespace}.json.
  *
- * Returns the list of file paths written.
+ * Uses `resolveNamespaces` to handle filename collisions: if two source files
+ * share the same basename (e.g. src/Header.tsx and admin/Header.tsx), the second
+ * gets a numeric suffix (header_1.json).
+ *
+ * Returns the list of file paths written and the namespace map for the caller.
  */
 async function writeTranslations(
   results: ScanResult[],
   responses: Map<string, AIResponse>,
   config: LocalizerConfig,
   options: { dryRun: boolean; overwrite: boolean },
-): Promise<string[]> {
+): Promise<{ paths: string[]; namespaceMap: Map<string, string> }> {
   // Group resolved results by source file
   const byFile = new Map<string, ScanResult[]>();
   for (const result of results) {
@@ -224,10 +224,16 @@ async function writeTranslations(
     }
   }
 
+  // Resolve namespaces with collision detection across all source files in this batch
+  const namespaceMap = resolveNamespaces(Array.from(byFile.keys()));
+
   const writtenPaths: string[] = [];
 
   for (const [sourceFile, fileResults] of byFile) {
-    const pageName = getPageName(sourceFile);
+    const namespace =
+      namespaceMap.get(sourceFile) ??
+      basename(sourceFile, extname(sourceFile)).toLowerCase();
+
     const allLanguages = [config.defaultLanguage, ...config.languages];
 
     // Collect unique keys for this file (deduplicated by key)
@@ -245,7 +251,7 @@ async function writeTranslations(
       const messagesPath = join(
         resolve(config.messagesDir),
         lang,
-        `${pageName}.json`,
+        `${namespace}.json`,
       );
 
       // Build (key, translation) pairs for this language
@@ -266,7 +272,7 @@ async function writeTranslations(
     }
   }
 
-  return writtenPaths;
+  return { paths: writtenPaths, namespaceMap };
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -288,6 +294,13 @@ export interface TranslateResult {
   uniqueStrings: number;
   /** Number of AI calls actually made (may be less if some were already cached externally) */
   aiCalls: number;
+  /**
+   * Maps absolute source file path → namespace (= JSON filename without .json).
+   * Pass this to `rewriteFiles()` so the hook namespace matches the JSON file.
+   *
+   * Example: { "/src/Header.tsx" → "header", "/admin/Header.tsx" → "header_1" }
+   */
+  namespaceMap: Map<string, string>;
 }
 
 /**
@@ -318,6 +331,7 @@ export async function translateStrings(
       messagesWritten: [],
       uniqueStrings: 0,
       aiCalls: 0,
+      namespaceMap: new Map(),
     };
   }
 
@@ -359,7 +373,7 @@ export async function translateStrings(
   const updatedResults = applyResolvedKeys(scanResults, valueToKey);
 
   // 5. Write translations to disk
-  const messagesWritten = await writeTranslations(
+  const { paths: messagesWritten, namespaceMap } = await writeTranslations(
     updatedResults,
     aiResponses,
     config,
@@ -372,6 +386,7 @@ export async function translateStrings(
     messagesWritten: dryRun ? [] : messagesWritten,
     uniqueStrings,
     aiCalls: aiResponses.size,
+    namespaceMap,
   };
 }
 

@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "fs/promises";
 import { resolve, basename, extname } from "path";
+import { resolveNamespaces } from "../namespace.js";
 import type { ScanResult, RewriteResult, LocalizerConfig } from "../types.js";
 import { applyStringReplacements, getAdapter } from "./transforms.js";
 import { ensureTranslationBoilerplate } from "./ts-morph.js";
@@ -65,15 +66,21 @@ export function generateDiff(
 
 /**
  * Rewrite a source file: replace hardcoded strings with t() calls,
- * add the i18n import and hook if missing.
+ * add the i18n import and hook if missing, and set the correct namespace.
  *
  * Does NOT write to disk — returns the modified source and diff.
  * The CLI layer handles confirmation and calls `applyRewrite` to persist.
+ *
+ * @param namespace  The i18n namespace to use in the hook call (e.g. "header").
+ *                   When omitted the lowercased filename is used.
+ *                   Pass the value from `resolveNamespaces()` when processing
+ *                   a batch of files to get correct collision-safe names.
  */
 export async function rewriteFile(
   filePath: string,
   results: ScanResult[],
   config: LocalizerConfig,
+  namespace?: string,
 ): Promise<RewriteResult> {
   const absolute = resolve(filePath);
   const originalSource = await readFile(absolute, "utf-8");
@@ -99,14 +106,16 @@ export async function rewriteFile(
     adapter,
   );
 
-  // Step 2: Ensure import + hook are present (ts-morph structural edits)
-  // Derive namespace from filename: Login.tsx → "login", home.tsx → "home"
-  const namespace = basename(filePath, extname(filePath)).toLowerCase();
+  // Step 2: Ensure import + hook are present with the correct namespace.
+  // Use the provided namespace, or fall back to the lowercased filename.
+  const resolvedNamespace =
+    namespace ?? basename(filePath, extname(filePath)).toLowerCase();
+
   const finalSource = ensureTranslationBoilerplate(
     afterReplacements,
     filePath,
     adapter,
-    namespace,
+    resolvedNamespace,
   );
 
   const diff = generateDiff(originalSource, finalSource, filePath);
@@ -133,14 +142,27 @@ export async function applyRewrite(result: RewriteResult): Promise<RewriteResult
 /**
  * Rewrite multiple files. Each file is processed independently.
  * Results are returned in the same order as the input file list.
+ *
+ * @param namespaceMap  Optional map of absolute filePath → namespace.
+ *                      When provided, collision-safe names are used.
+ *                      When omitted, each file derives its namespace from its filename.
+ *                      Pass the `namespaceMap` from `translateStrings()` to keep
+ *                      the translate and rewrite steps in sync.
  */
 export async function rewriteFiles(
   fileResultsMap: Map<string, ScanResult[]>,
   config: LocalizerConfig,
+  namespaceMap?: Map<string, string>,
 ): Promise<RewriteResult[]> {
+  // If no map was provided, build one from the files in this batch so that
+  // any filename collisions within the batch are resolved consistently.
+  const effectiveNsMap =
+    namespaceMap ?? resolveNamespaces(Array.from(fileResultsMap.keys()));
+
   const rewrites: RewriteResult[] = [];
   for (const [filePath, results] of fileResultsMap) {
-    const rewrite = await rewriteFile(filePath, results, config);
+    const namespace = effectiveNsMap.get(filePath);
+    const rewrite = await rewriteFile(filePath, results, config, namespace);
     rewrites.push(rewrite);
   }
   return rewrites;
